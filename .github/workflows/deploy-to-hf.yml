@@ -13,6 +13,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # -----------------------------
+      # Train the model first
+      # -----------------------------
+      - name: Train model
+        run: |
+          python generate_data.py
+          python train_model.py
+
       - name: Set up Git identity
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
