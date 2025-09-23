@@ -1,0 +1,38 @@
+name: Deploy to Hugging Face Space
+
+on:
+  push:
+    branches:
+      - main   # change if your repo's default branch is different
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Git identity
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+      - name: Clone Hugging Face Space
+        run: |
+          HF_USERNAME="udaysankarjalli"
+          SPACE_NAME="flight-price-predictor"
+
+          git clone https://$HF_USERNAME:${{ secrets.HG_FLIGHTDATA }}@huggingface.co/spaces/$HF_USERNAME/$SPACE_NAME hf-space
+
+      - name: Sync files into Space repo
+        run: |
+          rsync -av --delete --exclude='.git' ./ hf-space/
+          cd hf-space
+          git add .
+          git commit -m "Sync from GitHub: $GITHUB_SHA" || echo "No changes to commit"
+
+      - name: Push to Hugging Face
+        run: |
+          cd hf-space
+          git push origin main
