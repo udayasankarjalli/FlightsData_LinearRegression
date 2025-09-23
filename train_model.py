@@ -8,6 +8,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 import matplotlib.pyplot as plt
+import joblib
 
 
 # 1. Load Data
@@ -119,3 +120,10 @@ plt.xlabel("Actual Price")
 plt.ylabel("Predicted Price")
 plt.title("Actual vs Predicted Price (Gradient Descent)")
 plt.show()
+
+# Save scaler and model weights
+joblib.dump(scaler, "scaler.pkl")
+np.save("theta.npy", theta)
+
+print("Model and scaler saved successfully!")
+
