@@ -1,66 +1,121 @@
+# ----------------------------
+# Step 0: Import Libraries
+# ----------------------------
 import pandas as pd
 import numpy as np
-import joblib
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
+import matplotlib.pyplot as plt
 
-# Gradient Descent Linear Regression Implementation
-class LinearRegressionGD:
-    def __init__(self, lr=0.001, n_iter=1000):
-        self.lr = lr
-        self.n_iter = n_iter
-
-    def fit(self, X, y):
-        m, n = X.shape
-        self.theta = np.zeros(n)
-        self.bias = 0
-
-        for _ in range(self.n_iter):
-            y_pred = np.dot(X, self.theta) + self.bias
-            d_theta = -(2/m) * np.dot(X.T, (y - y_pred))
-            d_bias = -(2/m) * np.sum(y - y_pred)
-
-            self.theta -= self.lr * d_theta
-            self.bias -= self.lr * d_bias
-
-    def predict(self, X):
-        return np.dot(X, self.theta) + self.bias
 
 # 1. Load Data
 data = pd.read_csv("flights_data.csv")
+data = pd.DataFrame(data)
 
-# 2. Handle Nulls (fill with mean)
-data['flight_duration'].fillna(data['flight_duration'].mean(), inplace=True)
-data['fuel_cost'].fillna(data['fuel_cost'].mean(), inplace=True)
+# Example: assuming df is your DataFrame
+# Fill missing values
+data['flight_duration'].fillna(data['flight_duration'].median(), inplace=True)
+data['fuel_cost'].fillna(data['fuel_cost'].median(), inplace=True)
+print(data.info())
 
-# 3. Remove Outliers (z-score > 3)
-from scipy.stats import zscore
-data = data[(np.abs(zscore(data.select_dtypes(include=[np.number]))) < 3).all(axis=1)]
+# ----------------------------
+# Outlier Removal using IQR
+# ----------------------------
 
-# 4. Features/Target
-X = data.drop(columns=['price'])
-y = data['price']
+Q1 = data['price'].quantile(0.25)
+Q3 = data['price'].quantile(0.75)
+IQR = Q3 - Q1
 
-# Scale Features
+# Keep only rows where price is within 1.5*IQR
+data_clean = data[(data['price'] >= Q1 - 1.5*IQR) & (data['price'] <= Q3 + 1.5*IQR)]
+
+print("Original data shape:", data.shape)
+print("Data shape after removing outliers:", data_clean.shape)
+
+# ----------------------------
+# Step 1: Prepare Features and Target
+# ----------------------------
+# Assuming you already have a cleaned DataFrame 'data_clean'
+X = data_clean[['flight_duration', 'distance', 'seats_booked', 'fuel_cost', 'airline_rating']].values
+y = data_clean['price'].values.reshape(-1, 1)
+
+# Feature scaling (important for gradient descent)
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 
-# Train/Test Split
+# Add bias term (column of ones)
+X_scaled = np.hstack((np.ones((X_scaled.shape[0], 1)), X_scaled))
+
+# Train-test split
 X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
 
-# Train Model with Gradient Descent
-model = LinearRegressionGD(lr=0.001, n_iter=1000)
-model.fit(X_train, y_train)
+# ----------------------------
+# Step 2: Gradient Descent Implementation
+# ----------------------------
+def gradient_descent(X, y, lr=0.01, epochs=5000):
+    m, n = X.shape
+    theta = np.zeros((n, 1))  # Initialize weights
+    cost_history = []
 
-# Evaluate
-from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+    for i in range(epochs):
+        y_pred = np.dot(X, theta)
+        error = y_pred - y
+        cost = (1/(2*m)) * np.sum(error**2)
+        cost_history.append(cost)
 
-y_pred = model.predict(X_test)
-print("R2 Score:", r2_score(y_test, y_pred))
-print("MSE:", mean_squared_error(y_test, y_pred))
-print("MAE:", mean_absolute_error(y_test, y_pred))
+        # Gradient descent update
+        theta -= (lr/m) * np.dot(X.T, error)
 
-# Save model + scaler
-joblib.dump(model, "linear_model.pkl")
-joblib.dump(scaler, "scaler.pkl")
-print("Model and scaler saved successfully.")
+        # Optional: print cost every 500 epochs
+        if i % 500 == 0:
+            print(f"Epoch {i}, Cost: {cost:.2f}")
+
+    return theta, cost_history
+
+# ----------------------------
+# Step 3: Train the Model
+# ----------------------------
+theta, cost_history = gradient_descent(X_train, y_train, lr=0.01, epochs=5000)
+
+# ----------------------------
+# Step 4: Predictions
+# ----------------------------
+y_pred_train = np.dot(X_train, theta)
+y_pred_test = np.dot(X_test, theta)
+
+# ----------------------------
+# Step 5: Evaluate Model
+# ----------------------------
+r2_train = r2_score(y_train, y_pred_train)
+r2_test = r2_score(y_test, y_pred_test)
+mae_test = mean_absolute_error(y_test, y_pred_test)
+rmse_test = np.sqrt(mean_squared_error(y_test, y_pred_test))
+
+print("\nGradient Descent Linear Regression Evaluation:")
+print(f"Train R²: {r2_train:.3f}")
+print(f"Test R²: {r2_test:.3f}")
+print(f"Test MAE: {mae_test:.2f}")
+print(f"Test RMSE: {rmse_test:.2f}")
+
+# ----------------------------
+# Step 6: Visualize Cost Convergence
+# ----------------------------
+plt.figure(figsize=(4,3))
+plt.plot(cost_history)
+plt.xlabel("Epochs")
+plt.ylabel("Cost (MSE)")
+plt.title("Gradient Descent Convergence")
+plt.show()
+
+# ----------------------------
+# Step 7: Visualize Actual vs Predicted
+# ----------------------------
+plt.figure(figsize=(4,4))
+plt.scatter(y_test, y_pred_test, alpha=0.6, color='blue')
+plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--', linewidth=2)
+plt.xlabel("Actual Price")
+plt.ylabel("Predicted Price")
+plt.title("Actual vs Predicted Price (Gradient Descent)")
+plt.show()
