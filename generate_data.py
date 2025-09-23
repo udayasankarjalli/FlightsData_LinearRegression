@@ -42,3 +42,4 @@ data.loc[data.sample(frac=0.02).index, 'price'] = np.random.uniform(1000, 5000, 
 # Save dataset
 data.to_csv("flights_data.csv", index=False)
 print("Synthetic flight dataset saved to flights_data.csv")
+
