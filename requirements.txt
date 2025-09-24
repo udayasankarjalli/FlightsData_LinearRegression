@@ -4,5 +4,6 @@ scikit-learn
 joblib
 scipy
 matplotlib
-gradio
+gradio==5.47.0
+
 
