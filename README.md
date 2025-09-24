@@ -4,10 +4,11 @@ emoji: ✈️
 colorFrom: blue
 colorTo: green
 sdk: gradio
-sdk_version: "4.37.2"
+sdk_version: "5.47.0"
 app_file: app.py
 pinned: false
 ---
+
 
 # ✈️ Flight Price Predictor
 
