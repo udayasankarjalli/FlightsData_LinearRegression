@@ -54,3 +54,4 @@ jobs:
         run: |
           cd hf-space
           git push origin main
+          
