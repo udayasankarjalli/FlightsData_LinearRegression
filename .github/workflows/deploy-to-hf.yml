@@ -45,7 +45,7 @@ jobs:
 
       - name: Sync files into Space repo
         run: |
-          rsync -av --delete --exclude='.git' --ignore-missing-args ./ hf-space/
+          rsync -av --delete --exclude='.git' --exclude='.gitattributes' --ignore-missing-args ./ hf-space/
           cd hf-space
           git add .
           git commit -m "Sync from GitHub: $GITHUB_SHA" || echo "No changes to commit"
