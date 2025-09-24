@@ -2,8 +2,14 @@ import gradio as gr
 import numpy as np
 import joblib
 import os
+from fastapi import FastAPI
+from fastapi.middleware.wsgi import WSGIMiddleware
+from pydantic import BaseModel
+from starlette.requests import Request
 
+# ----------------------------
 # Load trained model and scaler
+# ----------------------------
 if not os.path.exists("scaler.pkl") or not os.path.exists("theta.npy"):
     raise FileNotFoundError(
         "Model files not found! Please run train_model.py first to generate scaler.pkl and theta.npy."
@@ -12,23 +18,41 @@ if not os.path.exists("scaler.pkl") or not os.path.exists("theta.npy"):
 scaler = joblib.load("scaler.pkl")
 theta = np.load("theta.npy")
 
-# Prediction function
-def predict_price(flight_duration, distance, seats_booked, fuel_cost, airline_rating):
-    # Prepare features as numpy array
-    features = np.array([[flight_duration, distance, seats_booked, fuel_cost, airline_rating]])
-    
-    # Scale using the same scaler from training
+# ----------------------------
+# FastAPI Setup
+# ----------------------------
+app = FastAPI(title="Flight Price Prediction API")
+
+class FlightData(BaseModel):
+    flight_duration: float
+    distance: float
+    seats_booked: int
+    fuel_cost: float
+    airline_rating: int
+
+@app.post("/predict")
+def api_predict(data: FlightData):
+    features = np.array([[data.flight_duration, data.distance, data.seats_booked,
+                          data.fuel_cost, data.airline_rating]])
     features_scaled = scaler.transform(features)
-
-    # Add bias column (1), same as during training
     features_scaled = np.hstack((np.ones((features_scaled.shape[0], 1)), features_scaled))
-
-    # Predict price
     predicted_price = np.dot(features_scaled, theta)
+    return {"predicted_price": float(predicted_price[0][0])}
 
+@app.get("/")
+def root():
+    return {"message": "Welcome! Use /predict endpoint to get flight price predictions."}
+
+# ----------------------------
+# Gradio UI Setup
+# ----------------------------
+def predict_price(flight_duration, distance, seats_booked, fuel_cost, airline_rating):
+    features = np.array([[flight_duration, distance, seats_booked, fuel_cost, airline_rating]])
+    features_scaled = scaler.transform(features)
+    features_scaled = np.hstack((np.ones((features_scaled.shape[0], 1)), features_scaled))
+    predicted_price = np.dot(features_scaled, theta)
     return f"Predicted Flight Price: ₹{predicted_price[0][0]:.2f}"
 
-# Gradio Interface
 with gr.Blocks() as demo:
     gr.Markdown("# ✈️ Flight Price Predictor")
     gr.Markdown("Enter flight details to estimate the price:")
@@ -52,6 +76,12 @@ with gr.Blocks() as demo:
         outputs=output
     )
 
-# Launch app
+# Mount Gradio UI on FastAPI
+app.mount("/gradio", WSGIMiddleware(demo.server_app))
+
+# ----------------------------
+# Run app
+# ----------------------------
 if __name__ == "__main__":
-    demo.launch()
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
